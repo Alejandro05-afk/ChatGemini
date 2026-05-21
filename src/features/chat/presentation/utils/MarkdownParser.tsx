@@ -37,6 +37,10 @@ const tokenizeMarkdown = (text: string): MarkdownSegment[] => {
       }
       
       if (foundEnd) continue;
+      // Si no encontramos el cierre, tratar ** como texto normal y avanzar
+      tokens.push({ type: 'text', content: '**' });
+      i += 2;
+      continue;
     }
 
     // Buscar `code`
@@ -58,6 +62,10 @@ const tokenizeMarkdown = (text: string): MarkdownSegment[] => {
       }
       
       if (foundEnd) continue;
+      // Si no encontramos el cierre, tratar ` como texto normal y avanzar
+      tokens.push({ type: 'text', content: '`' });
+      i += 1;
+      continue;
     }
 
     // Buscar *italic* (pero no **)
@@ -79,6 +87,10 @@ const tokenizeMarkdown = (text: string): MarkdownSegment[] => {
       }
       
       if (foundEnd) continue;
+      // Si no encontramos el cierre, tratar * como texto normal y avanzar
+      tokens.push({ type: 'text', content: '*' });
+      i += 1;
+      continue;
     }
 
     // Acumular texto normal

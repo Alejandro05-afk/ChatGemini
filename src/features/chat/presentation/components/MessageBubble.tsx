@@ -1,5 +1,6 @@
+import * as Speech from 'expo-speech';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Message } from '../../domain/entities/Message';
 import { MarkdownText } from '../utils/MarkdownParser';
 
@@ -7,6 +8,15 @@ interface Props { message: Message; }
 
 export const MessageBubble: React.FC<Props> = ({ message }) => {
   const isUser = message.role === 'user';
+
+  const handleSpeak = () => {
+    if (isUser) return;
+    Speech.speak(message.content, {
+      language: 'es-ES',
+      pitch: 1.0,
+      rate: 1.0,
+    });
+  };
 
   return (
     <View style={[styles.container, isUser ? styles.userContainer : styles.aiContainer]}>
@@ -17,10 +27,15 @@ export const MessageBubble: React.FC<Props> = ({ message }) => {
             {message.content}
           </Text>
         ) : (
-          // IA: renderizar markdown
-          <MarkdownText isUser={isUser} style={styles.text}>
-            {message.content}
-          </MarkdownText>
+          // IA: renderizar markdown con botón de audio
+          <View>
+            <TouchableOpacity onPress={handleSpeak} style={styles.speakButton}>
+              <Text style={styles.speakIcon}>🔊</Text>
+            </TouchableOpacity>
+            <MarkdownText isUser={isUser} style={styles.text}>
+              {message.content}
+            </MarkdownText>
+          </View>
         )}
       </View>
       <Text style={styles.timestamp}>
@@ -43,4 +58,10 @@ const styles = StyleSheet.create({
   userText:     { color: '#FFFFFF' },
   aiText:       { color: '#1E293B' },
   timestamp:    { fontSize: 10, color: '#94A3B8', marginTop: 2 },
+  speakButton:  { 
+    alignSelf: 'flex-end', 
+    marginBottom: 4,
+    padding: 4,
+  },
+  speakIcon:    { fontSize: 16 },
 });

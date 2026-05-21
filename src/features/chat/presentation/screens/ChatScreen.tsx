@@ -23,7 +23,7 @@ export const ChatScreen: React.FC = () => {
   useEffect(() => {
     if (transcript && !isRecording && Platform.OS === 'web') {
       setInputText(prev => {
-        const trimmedTranscript = transcript.replace(/\[🎤 Audio grabado:.*?\]/g, '').trim();
+        const trimmedTranscript = transcript.trim();
         return prev ? `${prev} ${trimmedTranscript}` : trimmedTranscript;
       });
       resetTranscript();
@@ -40,7 +40,7 @@ export const ChatScreen: React.FC = () => {
 
   const handleMicPress = async () => {
     if (Platform.OS !== 'web') {
-      setInputText(prev => prev + '[🎤 Función de voz disponible en Web o con Development Build]');
+      setInputText(prev => prev + '[🎤 Reconocimiento de voz disponible solo en Web]');
       return;
     }
     

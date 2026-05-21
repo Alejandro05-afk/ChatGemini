@@ -12,11 +12,11 @@ interface UseSpeechRecognitionReturn {
 }
 
 /**
- * Hook para reconocimiento de voz usando Web Audio API
+ * Hook para reconocimiento de voz usando Web Speech API
  * Compatible con Expo Go (sin módulos nativos)
  * 
- * En Web: Usa Web Audio API
- * En Mobile: Muestra placeholder amigable
+ * En Web: Usa Web Speech API (SpeechRecognition)
+ * En Mobile: Requiere Development Build con expo-speech-recognition
  */
 export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
   const [transcript, setTranscript] = useState('');
@@ -24,47 +24,93 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
   const [error, setError] = useState<string | null>(null);
   const [recordingDuration, setRecordingDuration] = useState(0);
   
-  const mediaRecorderRef = useRef<any>(null);
+  const recognitionRef = useRef<any>(null);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const streamRef = useRef<any>(null);
+  const interimTranscriptRef = useRef<string>('');
 
   const startRecording = useCallback(async () => {
     try {
       setError(null);
       setRecordingDuration(0);
+      interimTranscriptRef.current = '';
 
-      // En web, usar Web Audio API
+      // En web, usar Web Speech API
       if (Platform.OS === 'web') {
-        const stream = await (navigator.mediaDevices as any).getUserMedia({ audio: true });
-        streamRef.current = stream;
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         
-        const mediaRecorder = new (window as any).MediaRecorder(stream);
-        mediaRecorderRef.current = mediaRecorder;
-        
-        mediaRecorder.start();
-        setIsRecording(true);
+        if (!SpeechRecognition) {
+          setError('Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge.');
+          return;
+        }
 
-        let duration = 0;
-        durationIntervalRef.current = setInterval(() => {
-          duration += 0.1;
-          setRecordingDuration(Math.floor(duration * 10) / 10);
-        }, 100);
+        const recognition = new SpeechRecognition();
+        recognitionRef.current = recognition;
+        
+        recognition.lang = 'es-ES';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onstart = () => {
+          setIsRecording(true);
+          let duration = 0;
+          durationIntervalRef.current = setInterval(() => {
+            duration += 0.1;
+            setRecordingDuration(Math.floor(duration * 10) / 10);
+          }, 100);
+        };
+
+        recognition.onresult = (event: any) => {
+          let finalTranscript = '';
+          let interimTranscript = '';
+
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          interimTranscriptRef.current = interimTranscript;
+          setTranscript(finalTranscript || interimTranscript);
+        };
+
+        recognition.onerror = (event: any) => {
+          console.error('Speech recognition error:', event.error);
+          setError(`Error: ${event.error}`);
+          setIsRecording(false);
+          if (durationIntervalRef.current) {
+            clearInterval(durationIntervalRef.current);
+          }
+        };
+
+        recognition.onend = () => {
+          if (isRecording) {
+            // Si sigue grabando, reiniciar
+            try {
+              recognition.start();
+            } catch (e) {
+              setIsRecording(false);
+              if (durationIntervalRef.current) {
+                clearInterval(durationIntervalRef.current);
+              }
+            }
+          }
+        };
+
+        recognition.start();
       } else {
-        // En mobile, simular grabación
-        setIsRecording(true);
-        let duration = 0;
-        durationIntervalRef.current = setInterval(() => {
-          duration += 0.1;
-          setRecordingDuration(Math.floor(duration * 10) / 10);
-        }, 100);
+        // En mobile, mostrar mensaje de requerimiento de Development Build
+        setError('Reconocimiento de voz requiere Development Build con expo-speech-recognition');
       }
     } catch (err: any) {
-      const errorMessage = err?.message || 'Error al iniciar grabación';
+      const errorMessage = err?.message || 'Error al iniciar reconocimiento de voz';
       setError(errorMessage);
       setIsRecording(false);
-      console.error('Recording error:', err);
+      console.error('Speech recognition error:', err);
     }
-  }, []);
+  }, [isRecording]);
 
   const stopRecording = useCallback(async () => {
     try {
@@ -73,34 +119,23 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
         clearInterval(durationIntervalRef.current);
       }
 
-      if (Platform.OS === 'web' && mediaRecorderRef.current) {
-        // Detener MediaRecorder en web
-        mediaRecorderRef.current.stop();
-        
-        // Detener stream
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach((track: any) => track.stop());
-        }
-
-        setTranscript(`[🎤 Audio grabado: ${recordingDuration}s]`);
-      } else {
-        // En mobile, solo crear placeholder
-        setTranscript(`[🎤 Audio grabado: ${recordingDuration}s]`);
+      if (Platform.OS === 'web' && recognitionRef.current) {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
       }
 
       setIsRecording(false);
-      mediaRecorderRef.current = null;
-      streamRef.current = null;
     } catch (err: any) {
-      console.error('Error stopping recording:', err);
+      console.error('Error stopping speech recognition:', err);
       setIsRecording(false);
     }
-  }, [recordingDuration]);
+  }, []);
 
   const resetTranscript = useCallback(() => {
     setTranscript('');
     setError(null);
     setRecordingDuration(0);
+    interimTranscriptRef.current = '';
   }, []);
 
   return {
